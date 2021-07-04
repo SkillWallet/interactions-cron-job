@@ -1,0 +1,17 @@
+version: '3.4'
+
+services:
+  interactions-cron-job:
+    container_name: transactions-query-api
+    image: node
+    volumes:
+      - .:/app
+    working_dir: /app
+    ports:
+      - "7070:7070"
+    command: /bin/bash -c 'yarn; yarn start;'
+    networks:
+      - interactions-cron-job
+
+networks:
+  interactions-cron-job:
