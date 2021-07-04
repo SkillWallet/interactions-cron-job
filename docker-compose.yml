@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   interactions-cron-job:
-    container_name: transactions-query-api
+    container_name: interactions-cron-job
     image: node
     volumes:
       - .:/app
