@@ -42,6 +42,19 @@ async function getPartnerAgreementsAddresses() {
   return partnerAgreements;
 }
 
+
+async function getImportedAddressesPerAgreement(agreementAddress) {
+
+  const partnersAgreementContract = new ethers.Contract(
+    agreementAddress,
+    partnersAgreementAbi,
+    signer,
+  )
+
+  const importedContracts = await partnersAgreementContract.getImportedAddresses();
+  return importedContracts;
+}
+
 async function getCommunityAddress(partnersAgreement) {
   const partnersAgreementContract = new ethers.Contract(
     partnersAgreement,
@@ -63,32 +76,78 @@ async function getCommunityMembers(communityAddress) {
 }
 
 
-async function queryForNewInteractions(agreement, memberAddress) {
-
-  const partnersAgreementContract = new ethers.Contract(
-    agreement,
-    partnersAgreementAbi,
-    signer,
-  );
-  var options = { gasPrice: 1000000000000, gasLimit: 1000000 };
-  partnersAgreementContract.queryForNewInteractions(memberAddress, options);
-}
-
 async function interactionsJob() {
   const agreementsAddresses = await getPartnerAgreementsAddresses();
-  console.log(agreementsAddresses);
-  // agreementsAddresses.forEach(async agreement => {
-    // const agreement = agreementsAddresses[0];
-    // console.log(agreement)
-    const agreement = '0xcEf46F78182DF2a21bEFDA522A5F65fE4d0faA3E';
+  agreementsAddresses.forEach(async agreement => {
     const community = await getCommunityAddress(agreement);
     console.log('community', community)
     const members = await getCommunityMembers(community);
+    const contractAddresses = await getImportedAddressesPerAgreement(agreement);
+    const startBlock = 0;
+    if (contractAddress && contractAddresses.length() > 0) {
+      contractAddress.forEach(contract => {
+        members.forEach(member => {
+          getTxCountPerUserAndContractAddr(member, contractAddress,)
+        });
+      })
+    }
     console.log('members', members)
-
     console.log(agreement, community, members);
-    members.forEach(member => queryForNewInteractions(agreement, member));
-  // });
+    members.forEach(async member => {
+      const amountOfInteractions = await getTxCountPerUserAndContractAddr(agreement, member);
+      transferInteractionNFTs(amountOfInteractions)
+    });
+  });
+}
+
+const transferInteractionNFTs = async (partnersAgreement, userAddress, amountOfInteractions) => {
+  const partnersAgreementContract = new ethers.Contract(
+    partnersAgreement,
+    partnersAgreementAbi,
+    signer,
+  );
+
+  const transferTx = await partnersAgreementContract.transferInteractionNFTs(
+    userAddress,
+    amountOfInteractions
+  );
+
+  const transferTxResult = await transferTx.wait()
+  const { events } = transferTxResult
+  const transferedEventEmitted = events.find(
+    (e) => e.event === 'Transfer',
+  );
+
+  if (transferedEventEmitted)
+    console.log(`${userAddress} received ${amountOfInteractions} interactions!`);
+}
+
+const getTxCountPerUserAndContractAddr = async (userAddress, contractAddress, startBlock, chainID) => {
+  const covalentAPIKey = ''
+  let finished = false
+  let pageNumber = 0
+  let pageSize = 1000000000
+  let txCount = 0;
+  while (!finished) {
+    const url = `https://api.covalenthq.com/v1/${chainID}
+                /address/${userAddress}
+                /transactions_v2
+                /?&key=${covalentAPIKey}
+                &no-logs=true&
+                page-size=${pageSize}
+                &page-number=${pageNumber}`
+    const result = await axios.get(url)
+    if (result.data.data.items.length > 0) {
+      txCount += result.data.data.items.filter(
+        (tx) =>
+          tx.to_address &&
+          tx.block_height > startBlock &&
+          tx.to_address == contractAddress,
+      ).length
+    } else finished = true
+    pageNumber++
+  }
+  return txCount;
 }
 
 
